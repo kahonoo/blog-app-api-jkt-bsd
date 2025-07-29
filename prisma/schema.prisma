@@ -26,8 +26,25 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  blosog    Blog[]
 
   @@map("users")
+}
+
+model Blog {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  title       String   @unique
+  description String   @db.Text
+  thumbnail   String
+  content     String   @db.Text
+  category    String
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updateAt    DateTime @updatedAt
+
+  @@map("blogs")
 }
 
 enum Role {
