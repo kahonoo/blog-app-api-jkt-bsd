@@ -6,21 +6,22 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ForgotPasswordDTO } from "./dto/forgot-password.dto";
 import { LoginDTO } from "./dto/login.dto";
 import { RegisterDTO } from "./dto/register.dto";
+import { ResetPasswordDTO } from "./dto/reset-password.dto";
 
 export class AuthService {
-  private prismaService: PrismaService;
+  private prisma: PrismaService;
   private passwordService: PasswordService;
   private jwtService: JwtService;
   private mailService: MailService;
   constructor() {
-    this.prismaService = new PrismaService();
+    this.prisma = new PrismaService();
     this.passwordService = new PasswordService();
     this.jwtService = new JwtService();
     this.mailService = new MailService();
   }
 
   register = async (body: RegisterDTO) => {
-    const user = await this.prismaService.user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { email: body.email },
     });
 
@@ -32,7 +33,7 @@ export class AuthService {
       body.password
     );
 
-    return await this.prismaService.user.create({
+    return await this.prisma.user.create({
       data: {
         name: body.name,
         email: body.email,
@@ -44,7 +45,7 @@ export class AuthService {
   };
 
   login = async (body: LoginDTO) => {
-    const user = await this.prismaService.user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { email: body.email },
     });
     if (!user) {
@@ -71,7 +72,7 @@ export class AuthService {
   };
 
   forgotPassword = async (body: ForgotPasswordDTO) => {
-    const user = await this.prismaService.user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { email: body.email },
     });
 
@@ -103,4 +104,25 @@ export class AuthService {
 
     return {message: "Send email success"};
   };
+
+  resetPassword = async (body: ResetPasswordDTO, authUserId: number) => {
+    const user = await this.prisma.user.findFirst({
+      where: { id: authUserId },
+    });
+
+    if(!user) {
+      throw new ApiError("user not found", 400);
+    }
+
+    const hashedPassword = await this.passwordService.hashPassword(body.password);
+
+    await this.prisma.user.update({
+      where: { id: authUserId },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    return { message:"reset password success"}
+  }
 }
