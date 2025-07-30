@@ -1,7 +1,9 @@
 import { ApiError } from "../../utils/apiError";
 import { JwtService } from "../jwt/jwt.service";
+import { MailService } from "../mail/mail.service";
 import { PasswordService } from "../password/password.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ForgotPasswordDTO } from "./dto/forgot-password.dto";
 import { LoginDTO } from "./dto/login.dto";
 import { RegisterDTO } from "./dto/register.dto";
 
@@ -9,10 +11,12 @@ export class AuthService {
   private prismaService: PrismaService;
   private passwordService: PasswordService;
   private jwtService: JwtService;
+  private mailService: MailService;
   constructor() {
     this.prismaService = new PrismaService();
     this.passwordService = new PasswordService();
     this.jwtService = new JwtService();
+    this.mailService = new MailService();
   }
 
   register = async (body: RegisterDTO) => {
@@ -44,7 +48,7 @@ export class AuthService {
       where: { email: body.email },
     });
     if (!user) {
-      throw new ApiError("invalid credentials", 400 );
+      throw new ApiError("invalid credentials", 400);
     }
     const isPasswordValid = await this.passwordService.comparePassword(
       body.password,
@@ -64,5 +68,39 @@ export class AuthService {
     );
     const { password, ...userWithoutPassword } = user;
     return { ...userWithoutPassword, accessToken };
+  };
+
+  forgotPassword = async (body: ForgotPasswordDTO) => {
+    const user = await this.prismaService.user.findFirst({
+      where: { email: body.email },
+    });
+
+    if (!user) {
+      throw new ApiError("invalid email address", 400);
+    }
+
+    const payload = { id: user.id };
+
+    const token = this.jwtService.generateToken(
+      payload,
+      process.env.JWT_SECRET_RESET!,
+      { expiresIn: "15m" }
+    );
+
+    const resetLink = `http://localhost:3000/reset-password/${token}`;
+
+    await this.mailService.sendMail(
+      body.email,
+      "Reset Your Password",
+      "forgot-password",
+      {
+        name: user.name,
+        resetLink: resetLink,
+        expiryMinutes: "15",
+        year: new Date().getFullYear(),
+      }
+    );
+
+    return {message: "Send email success"};
   };
 }
